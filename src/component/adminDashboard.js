@@ -1,93 +1,55 @@
-import React, { useState, useEffect } from 'react';
+//adminDashboard
+import React, { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import api from '../utils/api';
+import { debounce } from 'lodash';
+import { setEditIndex, updateNewEntry, resetNewEntry } from '../utils/slices/formSlice';
+import { fetchData } from '../utils/slices/dataSlice';
 import '../styles.css';
 
 const AdminDashboard = () => {
-  const [data, setData] = useState([]);
-  const [stockNames, setStockNames] = useState([]);
-  const [months, setMonths] = useState([]);
-  const [editIndex, setEditIndex] = useState(null); // Track index of row in edit mode
-  const [newEntry, setNewEntry] = useState({
-    Key: '',
-    Trading_Symbol: '',
-    Stock_Name: '',
-    Expiry_Year: '',
-    Expiry_Month: '',
-    Strike_Price: '',
-    Options: '',
-    Target: '',
-    Stop_Loss: '',
-    Status: '',
-  });
+  const dispatch = useDispatch();
+  const { data, stockNames, months, isFetching, error } = useSelector((state) => state.data);
+  const { editIndex, newEntry } = useSelector((state) => state.form);
 
   useEffect(() => {
-    fetchData();
-    fetchStockNames();
-    fetchMonths();
+    dispatch(fetchData());
   }, []);
 
-  const fetchData = async () => {
-    try {
-      const response = await api.get('/data/get');
-      setData(response.data);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    }
-  };
-
-  const fetchStockNames = async () => {
-    try {
-      const response = await api.get('/stock-names');
-      setStockNames(response.data);
-    } catch (error) {
-      console.error('Error fetching stock names:', error);
-    }
-  };
-
-  const fetchMonths = async () => {
-    try {
-      const response = await api.get('/months');
-      setMonths(response.data);
-    } catch (error) {
-      console.error('Error fetching months:', error);
-    }
-  };
-
   const handleEdit = (index) => {
-    setEditIndex(index); // Enter edit mode for a specific row
+    dispatch(setEditIndex(index));
   };
-
+  
   const handleSave = async (index) => {
     try {
-      // Your API call to update the data
       await api.put(`/data/${data[index].id}`, data[index]);
-      setEditIndex(null); // Exit edit mode after saving
-      fetchData(); // Refresh data after saving
+      dispatch(setEditIndex(null));
+      dispatch(fetchData()); // Dispatch fetchData after successful save
     } catch (error) {
       console.error('Error saving data:', error);
     }
   };
+  
 
-  const handleInputChange = (e) => {
+  const debouncedInputChange = debounce(handleInputChange, 300);
+
+  function handleInputChange(e) {
     const { name, value } = e.target;
-    setNewEntry((prevEntry) => ({
-      ...prevEntry,
+    const updatedEntry = {
+      ...newEntry,
       [name]: value,
-    }));
+    };
 
-    // Calculate Key and Trading_Symbol based on rules
-    const tradingSymbol = `${value}${newEntry.Expiry_Month}${newEntry.Strike_Price}${newEntry.Options}`;
-    const key = `${tradingSymbol}${newEntry.Target}${newEntry.Stop_Loss}`;
-    setNewEntry((prevEntry) => ({
-      ...prevEntry,
-      Key: key,
-      Trading_Symbol: tradingSymbol,
-    }));
-  };
+    const tradingSymbol = `${value}${updatedEntry.Expiry_Month}${updatedEntry.Strike_Price}${updatedEntry.Options}`;
+    const key = `${tradingSymbol}${updatedEntry.Target}${updatedEntry.Stop_Loss}`;
+    updatedEntry.Key = key;
+    updatedEntry.Trading_Symbol = tradingSymbol;
+
+    dispatch(updateNewEntry(updatedEntry));
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Validate required fields
     const requiredFields = [
       'Stock_Name',
       'Expiry_Year',
@@ -105,22 +67,10 @@ const AdminDashboard = () => {
       return;
     }
     try {
-      // Send data to backend
       await api.post('/data/post', newEntry);
       alert('Data submitted successfully!');
-      setNewEntry({
-        Stock_Name: '',
-        Expiry_Year: '',
-        Expiry_Month: '',
-        Strike_Price: '',
-        Options: '',
-        Target: '',
-        Stop_Loss: '',
-        Status: '',
-        Key: '',
-        Trading_Symbol: '',
-      });
-      fetchData(); // Refresh data after submitting
+      dispatch(resetNewEntry());
+      dispatch(fetchData()); // Dispatch fetchData after successful submit
     } catch (error) {
       console.error('Error submitting data:', error);
       alert('Error submitting data. Please try again.');
@@ -155,7 +105,7 @@ const AdminDashboard = () => {
                           <select
                             name={key}
                             value={item[key]}
-                            onChange={(e) => handleInputChange(e)}
+                            onChange={(e) => debouncedInputChange(e)}
                           >
                             <option value="">Select Option</option>
                             <option value="PE">PE</option>
@@ -165,7 +115,7 @@ const AdminDashboard = () => {
                           <select
                             name={key}
                             value={item[key]}
-                            onChange={(e) => handleInputChange(e)}
+                            onChange={(e) => debouncedInputChange(e)}
                           >
                             <option value="">Select Status</option>
                             <option value="Open">Open</option>
@@ -175,7 +125,7 @@ const AdminDashboard = () => {
                           <select
                             name={key}
                             value={item[key]}
-                            onChange={(e) => handleInputChange(e)}
+                            onChange={(e) => debouncedInputChange(e)}
                           >
                             <option value="">Select Month</option>
                             {months.map((month) => (
@@ -186,7 +136,7 @@ const AdminDashboard = () => {
                           <select
                             name={key}
                             value={item[key]}
-                            onChange={(e) => handleInputChange(e)}
+                            onChange={(e) => debouncedInputChange(e)}
                           >
                             <option value="">Select Stock</option>
                             {stockNames.map((stock) => (
@@ -198,7 +148,7 @@ const AdminDashboard = () => {
                             type="text"
                             name={key}
                             value={item[key]}
-                            onChange={(e) => handleInputChange(e)}
+                            onChange={(e) => debouncedInputChange(e)}
                           />
                         )
                       ) : item[key]
@@ -279,5 +229,4 @@ const AdminDashboard = () => {
     </div>
   );
 };
-
 export default AdminDashboard;

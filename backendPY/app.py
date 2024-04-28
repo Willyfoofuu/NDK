@@ -1,9 +1,7 @@
+#app.py
 import os
 from flask import Flask, request, jsonify
-from google.oauth2 import service_account
 from googleapiclient.discovery import build
-import json
-import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from flask_cors import CORS
