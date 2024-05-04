@@ -33,11 +33,29 @@ spreadsheet_id = '1A9wibWu0HjDcUWBpV8YDpQYbwYPnenMFgJSwXIF6kg8'  # Replace with 
 def get_data():
     try:
         sheet = service.spreadsheets()
-        result = sheet.values().get(spreadsheetId=spreadsheet_id, range='Thresholds!A1:J100').execute()
+        result = sheet.values().get(spreadsheetId=spreadsheet_id, range='Thresholds!A1:K100').execute()
         values = result.get('values', [])
-        return jsonify(values)
+
+        # Check if values exist
+        if not values:
+            return jsonify({'error': 'No data found'}), 404
+
+        # Assuming the first row contains headers
+        headers = values[0]
+        data = []
+
+        # Iterate over rows starting from the second row (values[1:])
+        for row in values[1:]:
+            entry = {}
+            for idx, header in enumerate(headers):
+                if idx < len(row):
+                    entry[header] = row[idx]
+            data.append(entry)
+
+        return jsonify(data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 # Endpoint to add data to Google Sheets
 # Ensure 'Key' and 'Trading_Symbol' are not submitted by the frontend

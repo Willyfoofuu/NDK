@@ -28,10 +28,16 @@ const dataSlice = createSlice({
       state.isFetching = false;
       state.error = action.payload.error;
     },
+    setData: (state, action) => {
+      state.data = action.payload;
+    },
+    addRow: (state, action) => {
+      state.data = [...state.data, action.payload];
+    },
   },
 });
 
-export const { fetchDataRequest, fetchDataSuccess, fetchDataFailure } = dataSlice.actions;
+export const { fetchDataRequest, fetchDataSuccess, fetchDataFailure, setData, addRow } = dataSlice.actions;
 
 export const fetchData = () => async (dispatch) => {
   dispatch(fetchDataRequest());

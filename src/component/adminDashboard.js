@@ -1,55 +1,69 @@
-//adminDashboard
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { AgGridReact } from 'ag-grid-react';
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
 import api from '../utils/api';
-import { debounce } from 'lodash';
-import { setEditIndex, updateNewEntry, resetNewEntry } from '../utils/slices/formSlice';
-import { fetchData } from '../utils/slices/dataSlice';
+import { updateNewEntry, resetNewEntry } from '../utils/slices/formSlice';
 import '../styles.css';
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
+import { fetchData, addRow, setData } from '../utils/slices/dataSlice';
 
 const AdminDashboard = () => {
   const dispatch = useDispatch();
-  const { data, stockNames, months, isFetching, error } = useSelector((state) => state.data);
-  const { editIndex, newEntry } = useSelector((state) => state.form);
+  const { data, stockNames, months } = useSelector((state) => state.data);
+  const { newEntry } = useSelector((state) => state.form);
 
   useEffect(() => {
     dispatch(fetchData());
-  }, []);
+  }, [dispatch]);
 
-  const handleEdit = (index) => {
-    dispatch(setEditIndex(index));
-  };
-  
-  const handleSave = async (index) => {
+
+  const handleSave = async (params) => {
     try {
-      await api.put(`/data/${data[index].id}`, data[index]);
-      dispatch(setEditIndex(null));
-      dispatch(fetchData()); // Dispatch fetchData after successful save
+      console.log('params.data:', params.data);
+      await api.put(`/data/${params.data.id}`, params.data);
+      dispatch(fetchData());
     } catch (error) {
       console.error('Error saving data:', error);
     }
   };
   
 
-  const debouncedInputChange = debounce(handleInputChange, 300);
-
-  function handleInputChange(e) {
-    const { name, value } = e.target;
-    const updatedEntry = {
-      ...newEntry,
-      [name]: value,
-    };
-
-    const tradingSymbol = `${value}${updatedEntry.Expiry_Month}${updatedEntry.Strike_Price}${updatedEntry.Options}`;
+  const handleInputChange = (event, index) => {
+    const { name, value } = event.target;
+    const updatedData = [...data];
+    const isEmptyRow = updatedData[index] === undefined || Object.keys(updatedData[index]).length === 0;
+  
+    let updatedEntry;
+    if (isEmptyRow) {
+      updatedEntry = { ...newEntry, [name]: value };
+    } else {
+      updatedEntry = { ...updatedData[index], [name]: value };
+      // Create a new object with the necessary properties
+      updatedEntry = {
+        id: updatedEntry.id,
+        Stock_Name: updatedEntry.Stock_Name,
+        Expiry_Month: updatedEntry.Expiry_Month,
+        // Add other necessary properties
+        [name]: value
+      };
+    }
+  
+    const tradingSymbol = `${updatedEntry.Stock_Name}${updatedEntry.Expiry_Month}${updatedEntry.Strike_Price}${updatedEntry.Options}`;
     const key = `${tradingSymbol}${updatedEntry.Target}${updatedEntry.Stop_Loss}`;
     updatedEntry.Key = key;
     updatedEntry.Trading_Symbol = tradingSymbol;
+    updatedData[index] = updatedEntry;
+    dispatch(setData(updatedData));
+  };
+  
+  
+  
 
-    dispatch(updateNewEntry(updatedEntry));
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     const requiredFields = [
       'Stock_Name',
       'Expiry_Year',
@@ -70,163 +84,111 @@ const AdminDashboard = () => {
       await api.post('/data/post', newEntry);
       alert('Data submitted successfully!');
       dispatch(resetNewEntry());
-      dispatch(fetchData()); // Dispatch fetchData after successful submit
+      dispatch(fetchData());
     } catch (error) {
       console.error('Error submitting data:', error);
       alert('Error submitting data. Please try again.');
     }
   };
 
+ 
+  const columnDefs = [
+    { headerName: 'Key', field: 'Key', editable: false },
+    { headerName: 'Trading Symbol', field: 'Trading_Symbol', editable: false },
+    { headerName: 'Account', field: 'Account', editable: false },
+    {
+      headerName: 'Stock Name',
+      field: 'Stock_Name',
+      editable: true,
+      cellEditor: 'agSelectCellEditor',
+      cellEditorParams: {
+        values: stockNames
+      },
+      cellRenderer: (params) => {
+        return params.value; // Display the selected value in the dropdown
+      }
+    },
+    { headerName: 'Expiry Year', field: 'Expiry_Year', editable: true },
+    {
+      headerName: 'Expiry Month',
+      field: 'Expiry_Month',
+      editable: true,
+      cellEditor: 'agSelectCellEditor',
+      cellEditorParams: {
+        values: months
+      },
+      cellRenderer: (params) => {
+        return params.value; // Display the selected value in the dropdown
+      }
+    },
+    { headerName: 'Strike Price', field: 'Strike_Price', editable: true },
+    { headerName: 'Options', field: 'Options', editable: true },
+    { headerName: 'Target', field: 'Target', editable: true },
+    { headerName: 'Stop Loss', field: 'Stop_Loss', editable: true },
+    { headerName: 'Status', field: 'Status', editable: true },
+    {
+      headerName: 'Actions',
+      cellRenderer: (params) => {
+        return (
+          <div>
+            <button onClick={() => handleSave(params)}>Save</button>
+          </div>
+        );
+      },
+      minWidth: 120,
+      maxWidth: 150
+    }
+  ];
+  
+
+  const handleAddRow = async () => {
+    try {
+      // Create the new row data
+      const tradingSymbol = `${newEntry.Stock_Name}${newEntry.Expiry_Month}${newEntry.Strike_Price}${newEntry.Options}`;
+      const key = `${tradingSymbol}${newEntry.Target}${newEntry.Stop_Loss}`;
+      const newRowData = {
+        id: Math.random(), // Generate a unique ID (replace with your ID generation logic)
+        Key: key,
+        Trading_Symbol: tradingSymbol,
+        ...newEntry
+      };
+  
+      // Dispatch an action to add the new row to the Redux store
+      dispatch(addRow(newRowData));
+  
+      // Reset the newEntry form after adding the row
+      dispatch(resetNewEntry());
+    } catch (error) {
+      console.error('Error adding new row:', error);
+      alert('Error adding new row. Please try again.');
+    }
+  };
+  
+  
+  
+  
+  
+  
+
   return (
     <div>
       <h2>Welcome Admin!</h2>
       <form className="admin-form" onSubmit={handleSubmit}>
-        <table className="admin-table">
-          <thead>
-            <tr>
-              {/* Render table headers */}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((item, index) => (
-              <tr key={index}>
-                {Object.keys(item).map((key, idx) => (
-                  <td key={idx}>
-                    {key === 'Key' || key === 'Trading_Symbol' ? (
-                      <input
-                        type="text"
-                        value={item[key]}
-                        readOnly
-                        style={{ backgroundColor: '#f0f0f0' }}
-                      />
-                    ) : (
-                      editIndex === index ? (
-                        key === 'Options' ? (
-                          <select
-                            name={key}
-                            value={item[key]}
-                            onChange={(e) => debouncedInputChange(e)}
-                          >
-                            <option value="">Select Option</option>
-                            <option value="PE">PE</option>
-                            <option value="CE">CE</option>
-                          </select>
-                        ) : key === 'Status' ? (
-                          <select
-                            name={key}
-                            value={item[key]}
-                            onChange={(e) => debouncedInputChange(e)}
-                          >
-                            <option value="">Select Status</option>
-                            <option value="Open">Open</option>
-                            <option value="Close">Close</option>
-                          </select>
-                        ) : key === 'Expiry_Month' ? (
-                          <select
-                            name={key}
-                            value={item[key]}
-                            onChange={(e) => debouncedInputChange(e)}
-                          >
-                            <option value="">Select Month</option>
-                            {months.map((month) => (
-                              <option key={month} value={month}>{month}</option>
-                            ))}
-                          </select>
-                        ) : key === 'Stock_Name' ? (
-                          <select
-                            name={key}
-                            value={item[key]}
-                            onChange={(e) => debouncedInputChange(e)}
-                          >
-                            <option value="">Select Stock</option>
-                            {stockNames.map((stock) => (
-                              <option key={stock} value={stock}>{stock}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            name={key}
-                            value={item[key]}
-                            onChange={(e) => debouncedInputChange(e)}
-                          />
-                        )
-                      ) : item[key]
-                    )}
-                  </td>
-                ))}
-                <td>
-                  {editIndex === index ? (
-                    <button onClick={() => handleSave(index)}>Save</button>
-                  ) : (
-                    <button onClick={() => handleEdit(index)}>Edit</button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            <tr>
-              {Object.keys(newEntry).map((key, idx) => (
-                <td key={idx}>
-                  {key === 'Options' ? (
-                    <select
-                      name={key}
-                      value={newEntry[key]}
-                      onChange={(e) => handleInputChange(e)}
-                    >
-                      <option value="">Select Option</option>
-                      <option value="PE">PE</option>
-                      <option value="CE">CE</option>
-                    </select>
-                  ) : key === 'Status' ? (
-                    <select
-                      name={key}
-                      value={newEntry[key]}
-                      onChange={(e) => handleInputChange(e)}
-                    >
-                      <option value="">Select Status</option>
-                      <option value="Open">Open</option>
-                      <option value="Close">Close</option>
-                    </select>
-                  ) : key === 'Expiry_Month' ? (
-                    <select
-                      name={key}
-                      value={newEntry[key]}
-                      onChange={(e) => handleInputChange(e)}
-                    >
-                      <option value="">Select Month</option>
-                      {months.map((month) => (
-                        <option key={month} value={month}>{month}</option>
-                      ))}
-                    </select>
-                  ) : key === 'Stock_Name' ? (
-                    <select
-                      name={key}
-                      value={newEntry[key]}
-                      onChange={(e) => handleInputChange(e)}
-                    >
-                      <option value="">Select Stock</option>
-                      {stockNames.map((stock) => (
-                        <option key={stock} value={stock}>{stock}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      name={key}
-                      value={newEntry[key]}
-                      onChange={(e) => handleInputChange(e)}
-                    />
-                  )}
-                </td>
-              ))}
-              <td>
-                <button type="submit">Add</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div className="ag-theme-alpine" style={{ height: 400, width: '100%' }}>
+        <AgGridReact
+           
+            rowData={data}
+            columnDefs={columnDefs}
+            defaultColDef={{ flex: 1, minWidth: 150, resizable: true }}
+            editType="fullRow"
+            onCellValueChanged={handleInputChange}
+          />
+        </div>
+        <button type="submit">Add</button>
+        <button type="button" onClick={handleAddRow}>Add Row</button>
       </form>
     </div>
   );
 };
+
 export default AdminDashboard;
