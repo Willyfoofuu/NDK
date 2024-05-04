@@ -9,6 +9,7 @@ import '../styles.css';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { fetchData, addRow, setData } from '../utils/slices/dataSlice';
+import CustomCellRenderer from '../utils/customCellRenderer';
 
 const AdminDashboard = () => {
   const dispatch = useDispatch();
@@ -32,24 +33,21 @@ const AdminDashboard = () => {
   
 
   const handleInputChange = (event, index) => {
-    const { name, value } = event.target;
-    const updatedData = [...data];
-    const isEmptyRow = updatedData[index] === undefined || Object.keys(updatedData[index]).length === 0;
-  
-    let updatedEntry;
-    if (isEmptyRow) {
-      updatedEntry = { ...newEntry, [name]: value };
-    } else {
-      updatedEntry = { ...updatedData[index], [name]: value };
-      // Create a new object with the necessary properties
-      updatedEntry = {
-        id: updatedEntry.id,
-        Stock_Name: updatedEntry.Stock_Name,
-        Expiry_Month: updatedEntry.Expiry_Month,
-        // Add other necessary properties
-        [name]: value
-      };
+    if (!Array.isArray(data) || index < 0 || index >= data.length) {
+      console.error('Invalid data or index in handleInputChange');
+      return;
     }
+  
+    const { target } = event;
+    const { name, value } = target;
+    const updatedData = [...data];
+    let updatedEntry = { ...updatedData[index] };
+  
+    // Update the necessary properties
+    updatedEntry = {
+      ...updatedEntry,
+      [name]: value
+    };
   
     const tradingSymbol = `${updatedEntry.Stock_Name}${updatedEntry.Expiry_Month}${updatedEntry.Strike_Price}${updatedEntry.Options}`;
     const key = `${tradingSymbol}${updatedEntry.Target}${updatedEntry.Stop_Loss}`;
@@ -58,6 +56,10 @@ const AdminDashboard = () => {
     updatedData[index] = updatedEntry;
     dispatch(setData(updatedData));
   };
+  
+  
+  
+  
   
   
   
@@ -178,6 +180,10 @@ const AdminDashboard = () => {
         <AgGridReact
            
             rowData={data}
+            frameworkComponents={{
+              customCellRenderer: CustomCellRenderer,
+            }}
+            cellRenderer="customCellRenderer"
             columnDefs={columnDefs}
             defaultColDef={{ flex: 1, minWidth: 150, resizable: true }}
             editType="fullRow"
